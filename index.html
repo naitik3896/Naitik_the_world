@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Naitik the God - Smart Predictor</title>
+  <style>
+    body{background:#000;color:#b6ffb6;font-family:monospace;padding:18px}
+    h1{color:#7cff7c;text-align:center}
+    textarea{width:100%;height:200px;background:#041204;color:#b6ffb6;border:1px solid #0b3a0b;padding:10px}
+    button{padding:10px;margin-top:10px;border-radius:8px;border:none;background:#0bff3a;color:#002200;font-weight:bold;font-size:14px;margin-right:5px}
+    .card{background:#021002;padding:12px;border-radius:8px;margin-top:12px;border:1px solid #063006}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+    th,td{border:1px solid #063006;padding:4px;text-align:center}
+  </style>
+</head>
+<body>
+  <h1>Naitik the God</h1>
+  <div style="font-size:12px;opacity:0.8">Paste the latest results (top = newest). One digit 0–9 per line.</div>
+  
+  <textarea id="input" placeholder="Paste results here..."></textarea><br>
+  <button id="clean">Clean Input</button>
+  <button id="reverse">Reverse Order</button>
+  <button id="run">Analyze & Predict</button>
+
+  <div class="card" id="output"></div>
+
+  <script>
+    function parseInput(text){
+      return text.split(/\s+/)
+        .map(s=>s.trim())
+        .filter(s=>/^\d$/.test(s))
+        .map(s=>parseInt(s,10));
+    }
+
+    function toBS(n){ return (n>=5) ? 'BIG' : 'SMALL'; }
+
+    function methodTransition(seq, step=1){
+      if(seq.length<=step) return {pred:null, acc:0};
+      let correct=0, total=0;
+      const trans = {};
+      for(let i=step;i<seq.length;i++){
+        const from = seq[i];
+        const to = seq[i-step];
+        trans[from] = trans[from] || {BIG:0,SMALL:0};
+        trans[from][to]++;
+      }
+      for(let i=step;i<seq.length-1;i++){
+        const last = seq[i];
+        const t = trans[last];
+        if(!t) continue;
+        const p = (t.BIG>=t.SMALL) ? 'BIG':'SMALL';
+        if(seq[i-step]===p) correct++;
+        total++;
+      }
+      const lastVal = seq[0];
+      const tLast = trans[lastVal] || {BIG:0,SMALL:0};
+      const pred = (tLast.BIG>=tLast.SMALL) ? 'BIG':'SMALL';
+      return {pred, acc: total? Math.round(correct/total*100):0};
+    }
+
+    function methodRecentFreq(seq, n=10){
+      if(seq.length<1) return {pred:null, acc:0};
+      let correct=0,total=0;
+      for(let i=0;i<seq.length-1;i++){
+        const recent = seq.slice(i+1, i+1+n);
+        if(recent.length===0) continue;
+        const big = recent.filter(x=>x==='BIG').length;
+        const small = recent.length-big;
+        const p = (big>=small)?'BIG':'SMALL';
+        if(seq[i]===p) correct++;
+        total++;
+      }
+      const recentNow = seq.slice(0,n);
+      const bigNow = recentNow.filter(x=>x==='BIG').length;
+      const smallNow = recentNow.length-bigNow;
+      const pred = (bigNow>=smallNow)?'BIG':'SMALL';
+      return {pred, acc: total? Math.round(correct/total*100):0};
+    }
+
+    function methodGlobalMajority(seq){
+      const big = seq.filter(x=>x==='BIG').length;
+      const small = seq.length-big;
+      const pred = (big>=small)?'BIG':'SMALL';
+      let correct=0,total=0;
+      seq.forEach(v=>{ if(v===pred) correct++; total++; });
+      return {pred, acc: total? Math.round(correct/total*100):0};
+    }
+
+    document.getElementById('clean').addEventListener('click', ()=>{
+      const nums = parseInput(document.getElementById('input').value);
+      document.getElementById('input').value = nums.join('\n');
+    });
+
+    document.getElementById('reverse').addEventListener('click', ()=>{
+      const nums = parseInput(document.getElementById('input').value);
+      document.getElementById('input').value = nums.reverse().join('\n');
+    });
+
+    document.getElementById('run').addEventListener('click', ()=>{
+      const nums = parseInput(document.getElementById('input').value);
+      if(nums.length<5){ alert('Need at least 5 valid numbers.'); return; }
+      const bsSeq = nums.map(toBS);
+
+      const methods = [
+        {name:'Transition 1-step', ...methodTransition(bsSeq,1)},
+        {name:'Transition 2-step', ...methodTransition(bsSeq,2)},
+        {name:'Recent 10 frequency', ...methodRecentFreq(bsSeq,10)},
+        {name:'Global majority', ...methodGlobalMajority(bsSeq)}
+      ];
+
+      // pick best
+      const best = methods.reduce((a,b)=> b.acc>a.acc? b : a );
+      const out = [];
+      out.push('<b>Analyzed entries:</b> '+bsSeq.length);
+      out.push('<table><tr><th>Method</th><th>Prediction</th><th>Historical Accuracy</th></tr>');
+      methods.forEach(m=>{
+        out.push(`<tr><td>${m.name}</td><td>${m.pred||'-'}</td><td>${m.acc}%</td></tr>`);
+      });
+      out.push('</table>');
+      out.push(`<h2 style="margin-top:8px">Best Method → <span style="background:#0bff3a;color:#002;padding:4px 8px;border-radius:4px">${best.pred}</span> (Accuracy: ${best.acc}%)</h2>`);
+      document.getElementById('output').innerHTML = out.join('');
+    });
+  </script>
+</body>
+</html>
